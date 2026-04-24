@@ -17,59 +17,67 @@
       let
         pkgs = import nixpkgs { inherit system; };
 
-        # nix run nixpkgs#nix-prefetch-docker -- --image-name ubuntu --image-tag 24.04
-        ubuntuBase = pkgs.dockerTools.pullImage {
-          imageName = "ubuntu";
-          imageDigest = "sha256:c4a8d5503dfb2a3eb8ab5f807da5bc69a85730fb49b5cfca2330194ebcc41c7b";
-          hash = "sha256-4fNRgZzYvIKgzdJDOK5IH5fBkmzQQNMIDAEVoQj56Uk=";
-          finalImageName = "ubuntu";
-          finalImageTag = "24.04";
-        };
-      in
-      {
-        # nix build .#hello-image
-        packages.hello-image =
-          let
-            rootfsPackages = with pkgs; [
+        mkImage =
+          {
+            name,
+            baseImage,
+            packages,
+          }:
+          pkgs.dockerTools.buildLayeredImage {
+            name = name;
+            tag = "latest";
+            fromImage = baseImage;
+            contents = [
+              (pkgs.buildEnv {
+                name = "fhs-rootfs";
+                paths = packages;
+                pathsToLink = [
+                  "/bin"
+                  "/lib"
+                  "/etc"
+                ];
+              })
+            ];
+          };
+
+        # TODO: refactor
+
+        baseImages = import ./nix/base-images.nix;
+
+        ubuntuBase = pkgs.dockerTools.pullImage baseImages.ubuntu."24_04";
+        fedoraBase = pkgs.dockerTools.pullImage baseImages.fedora."43";
+
+        # nix build .#image-name
+        images = {
+          hello-ubuntu = mkImage {
+            name = "hello-ubuntu";
+            baseImage = ubuntuBase;
+            packages = with pkgs; [
               bash
               coreutils
               hello
             ];
-
-            fhsEnv = pkgs.buildEnv {
-              name = "fhs-rootfs";
-              paths = rootfsPackages;
-              pathsToLink = [
-                "/bin"
-                "/lib"
-                "/etc"
-              ];
-            };
-          in
-          pkgs.dockerTools.buildLayeredImage {
-            name = "hello-ubuntu";
-            tag = "latest";
-
-            fromImage = ubuntuBase;
-            contents = [ fhsEnv ];
-
-            config = {
-              Cmd = [ "${pkgs.hello}/bin/hello" ];
-              Env = [ "PATH=/bin" ];
-            };
           };
+          hello-fedora = mkImage {
+            name = "hello-fedora";
+            baseImage = fedoraBase;
+            packages = with pkgs; [
+              bash
+              coreutils
+              hello
+            ];
+          };
+        };
 
         # NOTE:
         # this script generates the tarball image ** at runtime **
-        #
-        # nix run .#hello-tarball
-        packages.hello-tarball =
-          let
-            image = self.packages.${system}.hello-image;
-          in
-          pkgs.writeShellScriptBin "create-rootfs" ''
+        mkTarball =
+          image:
+          pkgs.writeShellScriptBin "create-image-tarball" ''
             IMAGE_NAME="${image.imageName}"
             OUTPUT_FILE="''${1:-$IMAGE_NAME.tar.gz}"
+
+            echo "Creating $OUTPUT_FILE"
 
             echo "Loading OCI image into Docker"
             docker load < ${image}
@@ -83,8 +91,17 @@
             echo "Removing temporary container"
             docker rm "$CONTAINER_ID"
 
-            echo "Done! Rootfs saved to $OUTPUT_FILE"
+            echo "Done!"
           '';
+
+        # nix run .#script-name
+        rootfs-scripts = {
+          hello-ubuntu-tarball = mkTarball images.hello-ubuntu;
+          hello-fedora-tarball = mkTarball images.hello-fedora;
+        };
+      in
+      {
+        packages = images // rootfs-scripts;
       }
     );
 }
