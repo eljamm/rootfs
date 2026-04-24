@@ -16,11 +16,12 @@
       system:
       let
         pkgs = import nixpkgs { inherit system; };
+        lib = pkgs.lib;
 
         mkImage =
           {
             name,
-            baseImage,
+            baseImage ? null,
             packages,
           }:
           pkgs.dockerTools.buildLayeredImage {
@@ -47,27 +48,29 @@
         ubuntuBase = pkgs.dockerTools.pullImage baseImages.ubuntu."24_04";
         fedoraBase = pkgs.dockerTools.pullImage baseImages.fedora."43";
 
-        # nix build .#image-name
-        images = {
-          hello-ubuntu = mkImage {
+        images-raw = {
+          hello = {
+            name = "hello";
+            packages = with pkgs; [
+              bash
+              coreutils
+              hello
+            ];
+          };
+          hello-ubuntu = {
             name = "hello-ubuntu";
             baseImage = ubuntuBase;
-            packages = with pkgs; [
-              bash
-              coreutils
-              hello
-            ];
+            packages = images-raw.hello.packages;
           };
-          hello-fedora = mkImage {
+          hello-fedora = {
             name = "hello-fedora";
             baseImage = fedoraBase;
-            packages = with pkgs; [
-              bash
-              coreutils
-              hello
-            ];
+            packages = images-raw.hello.packages;
           };
         };
+
+        # nix build .#image-name
+        images = lib.mapAttrs (name: mkImage) images-raw;
 
         # NOTE:
         # this script generates the tarball image ** at runtime **
