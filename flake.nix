@@ -113,9 +113,19 @@
             packages = images-raw.hello.packages;
           };
         };
+
+        mkRootfsTarball =
+          rootfs:
+          pkgs.runCommand "${rootfs.name}-tarball" { } ''
+            tar -czf $out -C ${rootfs} .
+          '';
+
+        tarballs = lib.mapAttrs' (
+          name: value: lib.nameValuePair (name + "-tarball") (mkRootfsTarball value)
+        ) rootfses;
       in
       {
-        packages = rootfses // images // rootfs-scripts;
+        packages = tarballs // rootfses // images // rootfs-scripts;
       }
     );
 }
