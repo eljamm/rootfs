@@ -34,14 +34,14 @@
                 paths = packages;
                 pathsToLink = [
                   "/bin"
-                  "/lib"
                   "/etc"
+                  "/lib"
+                  "/lib64"
+                  "/sbin"
                 ];
               })
             ];
           };
-
-        # TODO: refactor
 
         baseImages = import ./nix/base-images.nix;
 
@@ -49,19 +49,19 @@
         fedoraBase = pkgs.dockerTools.pullImage baseImages.fedora."43";
 
         images-raw = {
-          hello = {
-            name = "hello";
+          felix86 = {
+            name = "felix86";
             packages = import ./nix/packages.nix pkgs;
           };
-          hello-ubuntu = {
-            name = "hello-ubuntu";
+          felix86-ubuntu = {
+            name = "felix86-ubuntu";
             baseImage = ubuntuBase;
-            packages = images-raw.hello.packages;
+            packages = images-raw.felix86.packages;
           };
-          hello-fedora = {
-            name = "hello-fedora";
+          felix86-fedora = {
+            name = "felix86-fedora";
             baseImage = fedoraBase;
-            packages = images-raw.hello.packages;
+            packages = images-raw.felix86.packages;
           };
         };
 
@@ -95,8 +95,8 @@
 
         # nix run .#script-name
         rootfs-scripts = {
-          hello-ubuntu-tarball = mkTarball images.hello-ubuntu;
-          hello-fedora-tarball = mkTarball images.hello-fedora;
+          felix86-ubuntu-tarball = mkTarball images.felix86-ubuntu;
+          felix86-fedora-tarball = mkTarball images.felix86-fedora;
         };
 
         mkRootfs = import ./nix/mk-rootfs.nix { inherit pkgs lib; };
@@ -105,12 +105,12 @@
           rootfs-ubuntu = mkRootfs {
             name = "rootfs-ubuntu";
             baseImage = ubuntuBase;
-            packages = images-raw.hello.packages;
+            packages = images-raw.felix86.packages;
           };
           rootfs-fedora = mkRootfs {
             name = "rootfs-fedora";
             baseImage = fedoraBase;
-            packages = images-raw.hello.packages;
+            packages = images-raw.felix86.packages;
           };
         };
 
