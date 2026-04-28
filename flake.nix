@@ -61,16 +61,16 @@
               file
               lsof
 
-              # rsync
-              # dbus
-              # systemd
-              # pulseaudio
+              rsync
+              dbus
+              systemd
+              pulseaudio
 
-              # libglvnd
-              # mesa
-              # mesa_glu
+              libglvnd
+              mesa
+              mesa_glu
 
-              # wine # 32-bit & 64-bit on x86_64-linux, else 32-bit
+              wine # 32-bit & 64-bit on x86_64-linux, else 32-bit
             ];
           };
           hello-ubuntu = {
@@ -118,9 +118,24 @@
           hello-ubuntu-tarball = mkTarball images.hello-ubuntu;
           hello-fedora-tarball = mkTarball images.hello-fedora;
         };
+
+        mkRootfs = import ./nix/mk-rootfs.nix { inherit pkgs lib; };
+
+        rootfses = {
+          rootfs-ubuntu = mkRootfs {
+            name = "rootfs-ubuntu";
+            baseImage = ubuntuBase;
+            packages = images-raw.hello.packages;
+          };
+          rootfs-fedora = mkRootfs {
+            name = "rootfs-fedora";
+            baseImage = fedoraBase;
+            packages = images-raw.hello.packages;
+          };
+        };
       in
       {
-        packages = images // rootfs-scripts;
+        packages = rootfses // images // rootfs-scripts;
       }
     );
 }
