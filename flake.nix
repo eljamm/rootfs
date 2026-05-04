@@ -20,7 +20,7 @@
         lib = pkgs.lib;
 
         # nix build .#image-name
-        images = import ./nix/images.nix { inherit pkgs; };
+        images = import ./nix/images.nix { inherit pkgs lib; };
 
         # nix run .#image-name-tarball
         tarball-scripts = import ./nix/tarballs.nix { inherit images pkgs lib; };

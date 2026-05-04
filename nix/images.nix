@@ -5,9 +5,9 @@
 
 let
   # recursively pull leaf base images
-  baseImages = lib.mapAttrsRecursiveCond (value: value ? "imageName") (
+  baseImages = lib.mapAttrsRecursiveCond (value: !(value ? "imageName")) (
     _name: value: pkgs.dockerTools.pullImage value
-  ) (import ./nix/base-images.nix);
+  ) (import ./base-images.nix);
 
   mkImage =
     {
@@ -38,14 +38,14 @@ let
 in
 
 {
-  ubuntu = mkImage {
-    name = "ubuntu";
-    baseImage = baseImages.ubuntu;
-    packages = commonPackages;
-  };
   fedora = mkImage {
     name = "fedora";
-    baseImage = baseImages.fedora;
+    baseImage = baseImages.fedora."43";
+    packages = commonPackages;
+  };
+  ubuntu = mkImage {
+    name = "ubuntu";
+    baseImage = baseImages.ubuntu."24_04";
     packages = commonPackages;
   };
 }
