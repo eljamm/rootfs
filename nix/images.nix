@@ -14,30 +14,39 @@ let
       name,
       baseImage ? null,
       packages,
+      type,
     }:
+
+    assert lib.elem type [
+      "minimal"
+      "full"
+    ];
+
+    let
+      basePackages = import ./packages.nix {
+        inherit pkgs lib type;
+      };
+    in
+
     pkgs.dockerTools.buildLayeredImage {
       name = name;
       tag = "latest";
       fromImage = baseImage;
-      contents = packages;
+      contents = basePackages ++ packages;
     };
-
-  # TODO: create an image for each type (minimal, full)
-  commonPackages = import ./packages.nix {
-    inherit pkgs lib;
-    type = "minimal";
-  };
 in
 
 {
   nix = mkImage {
     name = "nix";
     baseImage = baseImages.nix."2.32.8";
-    packages = commonPackages;
+    packages = [ ];
+    type = "full";
   };
   ubuntu = mkImage {
     name = "ubuntu";
     baseImage = baseImages.ubuntu."24_04";
-    packages = commonPackages;
+    packages = [ ];
+    type = "full";
   };
 }
