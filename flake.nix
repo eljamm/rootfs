@@ -29,10 +29,24 @@
         build-all = pkgs.writeShellScriptBin "build-rootfs-all" (
           lib.concatLines (map (c: c.text) (lib.attrValues rootfs-scripts))
         );
+
+        # WIP:
+        env =
+          (pkgs.buildFHSEnvBubblewrap {
+            name = "fhs-rootfs";
+            version = "0.1.0";
+            targetPkgs =
+              pkgs:
+              import ./nix/packages.nix {
+                inherit pkgs;
+                lib = pkgs.lib;
+                type = "full";
+              };
+          }).fhsenv;
       in
       {
         packages = {
-          inherit build-all;
+          inherit build-all env;
         }
         // images
         // rootfs-scripts;
