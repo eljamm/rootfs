@@ -7,9 +7,7 @@
 let
   mkTarball =
     image:
-    # NOTE:
-    # this script generates the tarball image ** at runtime **
-    pkgs.writeShellScriptBin "create-${image.imageName}-rootfs" ''
+    pkgs.runCommand "create-${image.imageName}-rootfs" { } ''
       set -e
 
       IMAGE_NAME="${image.imageName}"
