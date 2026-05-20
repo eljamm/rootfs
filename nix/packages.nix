@@ -33,6 +33,8 @@ let
         curl
         xz
         python3
+        libselinux
+        apt
 
         # audio
         pulseaudio
