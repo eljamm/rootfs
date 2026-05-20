@@ -30,17 +30,22 @@
           lib.concatLines (map (c: c.text) (lib.attrValues rootfs-scripts))
         );
 
-        felix86 = pkgs.writeShellApplication {
-          name = "felix86";
-          runtimeInputs = with pkgs; [
-            qemu
-            pkgsCross.riscv64.felix86
-          ];
-          text = ''
-            FELIX86_PATH=$(type -p felix86)
-            qemu-riscv64 -cpu max,vlen=256 "$FELIX86_PATH" "$@"
-          '';
-        };
+        felix86 =
+          # try using native felix if available on platform, else emulate it
+          if lib.meta.availableOn pkgs.stdenv.hostPlatform pkgs.felix86 then
+            pkgs.felix86
+          else
+            pkgs.writeShellApplication {
+              name = "felix86";
+              runtimeInputs = with pkgs; [
+                qemu
+                pkgsCross.riscv64.felix86
+              ];
+              text = ''
+                FELIX86_PATH=$(type -p felix86)
+                qemu-riscv64 -cpu max,vlen=256 "$FELIX86_PATH" "$@"
+              '';
+            };
 
         # WIP:
         env =
