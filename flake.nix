@@ -30,6 +30,18 @@
           lib.concatLines (map (c: c.text) (lib.attrValues rootfs-scripts))
         );
 
+        felix86 = pkgs.writeShellApplication {
+          name = "felix86";
+          runtimeInputs = with pkgs; [
+            qemu
+            pkgsCross.riscv64.felix86
+          ];
+          text = ''
+            FELIX86_PATH=$(type -p felix86)
+            qemu-riscv64 -cpu max,vlen=256 "$FELIX86_PATH" "$@"
+          '';
+        };
+
         # WIP:
         env =
           (pkgs.buildFHSEnvBubblewrap {
@@ -50,6 +62,13 @@
         }
         // images
         // rootfs-scripts;
+
+        # nix develop
+        devShell = pkgs.mkShell {
+          packages = [
+            felix86
+          ];
+        };
       }
     );
 }
