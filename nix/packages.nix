@@ -60,32 +60,36 @@ let
     };
 
     full = {
-      pkgs64 = with pkgs; [
-        # multimedia
-        SDL
-        SDL2
-        libjpeg_turbo
-        harfbuzz
+      pkgs64 =
+        types.minimal.pkgs64
+        ++ (with pkgs; [
+          # multimedia
+          SDL
+          SDL2
+          libjpeg_turbo
+          harfbuzz
 
-        # graphics
-        mesa
-        mesa_glu
-        libglvnd
-        glew
-        mesa-demos
-        vulkan-tools
-        libvdpau
-        libva
-        llvm
-        clinfo
+          # graphics
+          mesa
+          mesa_glu
+          libglvnd
+          glew
+          mesa-demos
+          vulkan-tools
+          libvdpau
+          libva
+          llvm
+          clinfo
 
-        # gaming
-        mangohud
-        winePackages.base # 32-bit & 64-bit on x86_64-linux, else 32-bit
-      ];
+          # gaming
+          mangohud
+          winePackages.base # 32-bit & 64-bit on x86_64-linux, else 32-bit
+        ]);
 
-      pkgs32 = with pkgs.pkgsi686Linux; [
-      ];
+      pkgs32 =
+        types.minimal.pkgs32
+        ++ (with pkgs.pkgsi686Linux; [
+        ]);
     };
   };
 in
