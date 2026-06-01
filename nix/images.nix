@@ -1,10 +1,11 @@
 {
   pkgs,
   lib,
-  nix2container,
 }:
 
 let
+  dockerTools = pkgs.dockerTools;
+
   mkImage =
     {
       name,
@@ -23,12 +24,13 @@ let
       };
     in
 
-    nix2container.buildImage {
+    dockerTools.buildLayeredImage {
       name = name;
       tag = "latest";
-      copyToRoot = basePackages ++ packages;
+      contents = basePackages ++ packages;
+      includeStorePaths = true;
       config = {
-        entrypoint = [ "${pkgs.bash}/bin/bash" ];
+        Cmd = [ "${pkgs.bash}/bin/bash" ];
       };
     };
 in
