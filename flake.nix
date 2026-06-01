@@ -4,6 +4,10 @@
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     flake-utils.url = "github:numtide/flake-utils";
+    nix2container = {
+      url = "github:nlewo/nix2container";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
   outputs =
@@ -11,6 +15,7 @@
       self,
       nixpkgs,
       flake-utils,
+      nix2container,
       ...
     }@inputs:
     flake-utils.lib.eachDefaultSystem (
@@ -18,6 +23,7 @@
       let
         pkgs = import nixpkgs { inherit system; };
         lib = pkgs.lib;
+        n2c = nix2container.packages.${system};
 
         # nix build .#image-name
         images = import ./nix/images.nix { inherit pkgs lib; };
