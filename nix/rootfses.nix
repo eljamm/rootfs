@@ -24,6 +24,7 @@ let
           libarchive
           rsync
           fakeroot
+          rdfind
         ];
       }
       ''
@@ -54,6 +55,30 @@ let
         mkdir -p "$out"
         ${pkgs.fakeroot}/bin/fakeroot bash -c '
           rsync -a --copy-unsafe-links "'"$SRC"'/" "'"$DST"'/"
+
+          # 4a. Strip runtime-unnecessary files
+          # Static libraries — useless outside of compilation
+          find "'"$DST"'" -name "*.a" -delete
+          # LLVM profiling tool — not needed at runtime
+          rm -f "'"$DST"'/usr/bin/llvm-exegesis"
+          # Python test/idle data
+          rm -rf "'"$DST"'"/usr/lib*/python3.*/test
+          rm -rf "'"$DST"'"/usr/lib*/python3.*/idlelib
+          rm -rf "'"$DST"'"/usr/lib*/python3.*/__pycache__
+          find "'"$DST"'" -name "*.pyc" -o -name "*.pyo" -delete
+          # Documentation — not needed at runtime
+          rm -rf "'"$DST"'"/usr/share/man
+          rm -rf "'"$DST"'"/usr/share/doc
+          rm -rf "'"$DST"'"/usr/share/info
+          # Locales — keep only essential (or none)
+          rm -f "'"$DST"'/usr/lib64/locale/locale-archive"
+          # GConf schemas cache — will be regenerated at runtime
+          rm -f "'"$DST"'/usr/share/GConf/gsettings.xml"
+          rm -f "'"$DST"'/usr/share/glib-2.0/schemas/gschemas.compiled"
+
+          # 4b. Hardlink identical files (fix rsync-broken hardlinks)
+          rdfind -makehardlinks true "'"$DST"'" > /dev/null 2>&1 || true
+
           bsdtar -czf "'"$out/${name}.tar.gz"'" \
             --exclude=nix-support \
             -C "'"$DST"'" .
