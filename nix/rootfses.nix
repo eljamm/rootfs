@@ -11,10 +11,12 @@ let
     }:
 
     let
+      packages = import ./packages.nix { inherit pkgs lib type; };
       fhsEnv = pkgs.buildFHSEnvBubblewrap {
         name = name;
-        targetPkgs = _: import ./packages.nix { inherit pkgs lib type; };
+        targetPkgs = _: packages;
       };
+      closureInfo = pkgs.closureInfo { rootPaths = packages; };
     in
 
     pkgs.runCommand name
@@ -37,11 +39,8 @@ let
         # fhsenv files are read-only; make writable so we can fix symlinks
         chmod -R u+w "$SRC"
 
-        # 2. Fix absolute symlinks to relative (rsync-safe)
-        #    e.g.  bin        -> /usr/bin   →  bin        -> usr/bin
-        #          usr/lib    -> /usr/lib64 →  usr/lib    -> lib64
-        #          usr/lib64/ld-linux.so.2 -> /usr/lib32/ld-linux.so.2
-        #                                →  usr/lib64/ld-linux.so.2 -> ../lib32/ld-linux.so.2
+        # 2. Fix absolute FHS symlinks to relative (rsync-safe).
+        #    Leave /nix/store symlinks as-is — they'll resolve from the store closure.
         find "$SRC" -type l | while read link; do
           target=$(readlink "$link")
           case "$target" in
@@ -52,33 +51,32 @@ let
           esac
         done
 
-        # 3. Selectively resolve: preserve safe symlinks,
-        #    dereference Nix store symlinks to actual files
         mkdir -p "$out"
         ${pkgs.fakeroot}/bin/fakeroot bash -c '
-          rsync -a --copy-unsafe-links "'"$SRC"'/" "'"$DST"'/"
+          # 3. Copy fhsenv structure (preserving all symlinks — no --copy-unsafe-links)
+          rsync -a "'"$SRC"'/" "'"$DST"'/"
 
-          # 4a. Strip runtime-unnecessary files
-          # Static libraries — useless outside of compilation
+          # 4. Include the Nix store closure so /nix/store symlinks resolve
+          while IFS= read -r p; do
+            [ -n "$p" ] && cp -a --parents "$p" "'"$DST"'/"
+          done < "'${closureInfo}'/store-paths"
+          chmod -R u+w "'"$DST"'"/nix
+
+          # 5. Strip runtime-unnecessary files (both FHS and Nix store paths)
           find "'"$DST"'" -name "*.a" -delete
-          # LLVM profiling tool — not needed at runtime
-          rm -f "'"$DST"'/usr/bin/llvm-exegesis"
-          # Python test/idle data
-          rm -rf "'"$DST"'"/usr/lib*/python3.*/test
-          rm -rf "'"$DST"'"/usr/lib*/python3.*/idlelib
-          rm -rf "'"$DST"'"/usr/lib*/python3.*/__pycache__
+          find "'"$DST"'" -name "llvm-exegesis" -type f -delete
+          find "'"$DST"'" -path "*/python3.*/test" -type d -exec rm -rf {} + 2>/dev/null || true
+          find "'"$DST"'" -path "*/python3.*/idlelib" -type d -exec rm -rf {} + 2>/dev/null || true
+          find "'"$DST"'" -name "__pycache__" -type d -exec rm -rf {} + 2>/dev/null || true
           find "'"$DST"'" -name "*.pyc" -o -name "*.pyo" -delete
-          # Documentation — not needed at runtime
-          rm -rf "'"$DST"'"/usr/share/man
-          rm -rf "'"$DST"'"/usr/share/doc
-          rm -rf "'"$DST"'"/usr/share/info
-          # Locales — keep only essential (or none)
-          rm -f "'"$DST"'/usr/lib64/locale/locale-archive"
-          # GConf schemas cache — will be regenerated at runtime
-          rm -f "'"$DST"'/usr/share/GConf/gsettings.xml"
-          rm -f "'"$DST"'/usr/share/glib-2.0/schemas/gschemas.compiled"
+          find "'"$DST"'" -path "*/share/man" -type d -exec rm -rf {} + 2>/dev/null || true
+          find "'"$DST"'" -path "*/share/doc" -type d -exec rm -rf {} + 2>/dev/null || true
+          find "'"$DST"'" -path "*/share/info" -type d -exec rm -rf {} + 2>/dev/null || true
+          find "'"$DST"'" -name "locale-archive" -delete
+          find "'"$DST"'" -name "gsettings.xml" -delete
+          find "'"$DST"'" -name "gschemas.compiled" -delete
 
-          # 4b. Hardlink identical files (fix rsync-broken hardlinks)
+          # 6. Hardlink identical files (fix rsync-broken hardlinks)
           rdfind -makehardlinks true "'"$DST"'" > /dev/null 2>&1 || true
 
           bsdtar -czf "'"$out/${name}.tar.gz"'" \
