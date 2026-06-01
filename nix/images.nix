@@ -1,12 +1,12 @@
 {
   pkgs,
   lib,
+  nix2container,
 }:
 
 let
-  # recursively pull leaf base images
   baseImages = lib.mapAttrsRecursiveCond (value: !(value ? "imageName")) (
-    _name: value: pkgs.dockerTools.pullImage value
+    _name: value: nix2container.pullImage value
   ) (import ./base-images.nix);
 
   mkImage =
@@ -28,14 +28,14 @@ let
       };
     in
 
-    pkgs.dockerTools.buildLayeredImage {
+    nix2container.buildImage {
       name = name;
       tag = "latest";
       fromImage = baseImage;
-      contents = basePackages ++ packages;
-      # WARN: only disable when debugging, else the resulting rootfs will not
-      # be self-contained
-      includeStorePaths = false;
+      copyToRoot = basePackages ++ packages;
+      config = {
+        entrypoint = [ "${pkgs.bash}/bin/bash" ];
+      };
     };
 in
 

@@ -26,15 +26,23 @@
         n2c = nix2container.packages.${system};
 
         # nix build .#image-name
-        images = import ./nix/images.nix { inherit pkgs lib; };
+        images = import ./nix/images.nix {
+          inherit pkgs lib;
+          nix2container = n2c.nix2container;
+        };
 
-        # nix run .#image-name-rootfs
-        rootfs-scripts = import ./nix/rootfses.nix { inherit images pkgs lib; };
+        # nix build .#image-name-rootfs
+        rootfs-scripts = import ./nix/rootfses.nix { inherit pkgs lib; };
 
-        # nix run .#build-all
-        build-all = pkgs.writeShellScriptBin "build-rootfs-all" (
-          lib.concatLines (map (c: c.text) (lib.attrValues rootfs-scripts))
-        );
+        # nix build .#build-all
+        build-all = pkgs.runCommand "build-rootfs-all" { } ''
+          mkdir -p $out
+          ${lib.concatStringsSep "\n" (
+            lib.mapAttrsToList (name: _: ''
+              ln -s "${rootfs-scripts.${name}}/${name}.tar.gz" "$out/${name}.tar.gz"
+            '') rootfs-scripts
+          )}
+        '';
 
         felix86 =
           # try using native felix if available on platform, else emulate it
