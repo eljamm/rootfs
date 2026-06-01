@@ -4,34 +4,9 @@
 }:
 
 let
-  baseImages = import ./base-images.nix;
-
-  mkPulledImage =
-    {
-      imageName,
-      imageDigest,
-      sha256,
-    }:
-    pkgs.runCommand "pulled-${builtins.replaceStrings [ "/" ":" ] [ "-" "-" ] imageName}"
-      {
-        outputHashMode = "recursive";
-        outputHashAlgo = "sha256";
-        outputHash = sha256;
-        nativeBuildInputs = with pkgs; [
-          skopeo
-          cacert
-        ];
-        impureEnvVars = lib.fetchers.proxyImpureEnvVars;
-      }
-      ''
-        skopeo copy "docker://${imageName}@${imageDigest}" "dir:$out" \
-          --insecure-policy --override-os linux --override-arch amd64
-      '';
-
   mkTarball =
     {
       name,
-      baseImageSpec,
       type,
     }:
 
@@ -45,13 +20,11 @@ let
         pathsToLink = [ "/" ];
         ignoreCollisions = true;
       };
-      pulled = mkPulledImage baseImageSpec;
     in
     pkgs.runCommand name
       {
         nativeBuildInputs = with pkgs; [
           libarchive
-          jq
           fakeroot
         ];
       }
@@ -59,25 +32,29 @@ let
         set -e
         ROOTFS_DIR=$(mktemp -d)
 
-        # Extract base image layers
-        manifest="${pulled}/manifest.json"
-        if [ -f "$manifest" ]; then
-          cat "$manifest" | jq -r '.layers[].digest' | while read digest; do
-            hash="''${digest#sha256:}"
-            layer_file="${pulled}/$hash"
-            if [ -f "$layer_file" ]; then
-              echo "Extracting layer: $hash"
-              bsdtar -xf "$layer_file" -C "$ROOTFS_DIR" 2>/dev/null || true
-            fi
-          done
+        # Create standard Linux directories
+        mkdir -p "$ROOTFS_DIR"/{etc,tmp,var,dev,proc,sys,run,root,home,media,mnt,opt,srv,usr}
+
+        # Copy our packages on top (under fakeroot for correct ownership)
+        # This creates real directories like bin/, lib/, etc.
+        # cp -rL dereferences symlinks; || true ignores broken symlinks
+        # in the buildEnv (e.g. dangling environment.d config)
+        if [ -d "${rootEnv}" ]; then
+          ${pkgs.fakeroot}/bin/fakeroot cp -rL "${rootEnv}/." "$ROOTFS_DIR/" || true
         fi
 
-        # Layer our packages on top (under fakeroot for correct ownership)
-        if [ -d "${rootEnv}" ]; then
-          ${pkgs.fakeroot}/bin/fakeroot cp -rL "${rootEnv}/." "$ROOTFS_DIR/"
-        fi
+        # Convert to usrmerge layout: move content from /{bin,lib,lib64,sbin}
+        # to /usr/{bin,lib,lib64,sbin} and replace with symlinks
+        for dir in bin lib lib64 sbin; do
+          if [ -d "$ROOTFS_DIR/$dir" ] && [ ! -L "$ROOTFS_DIR/$dir" ]; then
+            mkdir -p "$ROOTFS_DIR/usr"
+            mv "$ROOTFS_DIR/$dir" "$ROOTFS_DIR/usr/$dir"
+            ln -sf "usr/$dir" "$ROOTFS_DIR/$dir"
+          fi
+        done
 
         # Create tar.gz with exclusions (under fakeroot for root ownership in archive)
+        mkdir -p "$out"
         ${pkgs.fakeroot}/bin/fakeroot bsdtar -czf "$out/${name}.tar.gz" \
           --exclude=media --exclude=mnt --exclude=root --exclude=srv \
           --exclude=boot --exclude=home --exclude=run --exclude=proc \
@@ -92,12 +69,10 @@ in
 {
   nix-rootfs = mkTarball {
     name = "nix-rootfs";
-    baseImageSpec = baseImages.nix."2.32.8";
     type = "full";
   };
   ubuntu-rootfs = mkTarball {
     name = "ubuntu-rootfs";
-    baseImageSpec = baseImages.ubuntu."24_04";
     type = "full";
   };
 }
