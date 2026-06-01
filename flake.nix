@@ -74,6 +74,8 @@
             felix86
           ];
         };
+
+        formatter = pkgs.nixfmt-tree;
       }
     );
 }
