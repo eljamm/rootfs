@@ -33,6 +33,9 @@ let
       tag = "latest";
       fromImage = baseImage;
       contents = basePackages ++ packages;
+      # WARN: only disable when debugging, else the resulting rootfs will not
+      # be self-contained
+      includeStorePaths = false;
     };
 in
 
