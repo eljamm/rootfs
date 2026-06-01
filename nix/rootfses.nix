@@ -13,8 +13,7 @@ let
     let
       fhsEnv = pkgs.buildFHSEnvBubblewrap {
         name = name;
-        targetPkgs = _:
-          import ./packages.nix { inherit pkgs lib type; };
+        targetPkgs = _: import ./packages.nix { inherit pkgs lib type; };
       };
     in
 
@@ -38,14 +37,17 @@ let
         # fhsenv files are read-only; make writable so we can fix symlinks
         chmod -R u+w "$SRC"
 
-        # 2. Fix tree-internal absolute symlinks to relative
-        #    e.g. bin -> /usr/bin  →  bin -> usr/bin
-        #    These become "safe" for rsync --copy-unsafe-links
+        # 2. Fix absolute symlinks to relative (rsync-safe)
+        #    e.g.  bin        -> /usr/bin   →  bin        -> usr/bin
+        #          usr/lib    -> /usr/lib64 →  usr/lib    -> lib64
+        #          usr/lib64/ld-linux.so.2 -> /usr/lib32/ld-linux.so.2
+        #                                →  usr/lib64/ld-linux.so.2 -> ../lib32/ld-linux.so.2
         find "$SRC" -type l | while read link; do
           target=$(readlink "$link")
           case "$target" in
             /usr/*|/bin/*|/lib/*|/sbin/*|/etc/*)
-              ln -sf "''${target#/}" "$link"
+              rel=$(realpath -s --relative-to="$(dirname "$link")" "$SRC$target")
+              ln -sfn "$rel" "$link"
               ;;
           esac
         done
