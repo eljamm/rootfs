@@ -11,9 +11,8 @@ let
     }:
 
     let
-      allPackages = import ./packages.nix {
-        inherit pkgs lib type;
-      };
+      allPackages = import ./packages.nix { inherit pkgs lib type; };
+
       rootEnv = pkgs.buildEnv {
         name = "root";
         paths = allPackages;
@@ -21,6 +20,9 @@ let
         ignoreCollisions = true;
       };
     in
+
+    # Build and compress an FHS environment that follows UsrMerge:
+    # https://www.freedesktop.org/wiki/Software/systemd/TheCaseForTheUsrMerge
     pkgs.runCommand name
       {
         nativeBuildInputs = with pkgs; [
@@ -32,16 +34,12 @@ let
         set -e
         ROOTFS_DIR=$(mktemp -d)
 
-        # Create standard Linux directories
+        # standard Linux directories
         mkdir -p "$ROOTFS_DIR"/{etc,tmp,var,dev,proc,sys,run,root,home,media,mnt,opt,srv,usr}
 
-        # Copy our packages on top (under fakeroot for correct ownership)
-        # This creates real directories like bin/, lib/, etc.
-        # cp -rL dereferences symlinks; || true ignores broken symlinks
-        # in the buildEnv (e.g. dangling environment.d config)
-        if [ -d "${rootEnv}" ]; then
-          ${pkgs.fakeroot}/bin/fakeroot cp -rL "${rootEnv}/." "$ROOTFS_DIR/" || true
-        fi
+        # copy packages on top (under fakeroot for correct ownership)
+        # NOTE: symlinks are dereferenced and broken ones are ignored
+        fakeroot cp -rL "${rootEnv}/." "$ROOTFS_DIR/" || true
 
         # Convert to usrmerge layout: move content from /{bin,lib,lib64,sbin}
         # to /usr/{bin,lib,lib64,sbin} and replace with symlinks
