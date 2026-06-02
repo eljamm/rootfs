@@ -22,8 +22,8 @@
         # nix build .#image-name
         images = import ./nix/images.nix { inherit pkgs lib; };
 
-        # nix run .#image-name-rootfs
-        rootfs-scripts = import ./nix/rootfses.nix { inherit images pkgs lib; };
+        # nix build .#image-name-rootfs
+        rootfs-scripts = import ./nix/rootfses.nix { inherit pkgs lib images; };
 
         # nix run .#build-all
         build-all = pkgs.writeShellScriptBin "build-rootfs-all" (
