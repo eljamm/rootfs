@@ -2,6 +2,7 @@
   pkgs,
   lib,
   n2c,
+  ...
 }:
 
 let
@@ -23,6 +24,8 @@ let
       };
 
       rootEnv =
+        # Construct an FHS environment that follows UsrMerge
+        # See: https://www.freedesktop.org/wiki/Software/systemd/TheCaseForTheUsrMerge
         (pkgs.buildFHSEnvBubblewrap {
           name = "felix86-fhs-env";
           targetPkgs = _: basePackages ++ extraPackages;

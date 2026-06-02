@@ -2,6 +2,7 @@
   images,
   pkgs,
   lib,
+  ...
 }:
 
 let
