@@ -1,6 +1,7 @@
 {
   pkgs,
   lib,
+  n2c,
 }:
 
 let
@@ -22,10 +23,10 @@ let
       };
     in
 
-    pkgs.dockerTools.buildLayeredImage {
+    n2c.nix2container.buildImage {
       name = name;
       tag = "latest";
-      contents =
+      copyToRoot =
         (pkgs.buildFHSEnvBubblewrap {
           name = "felix86-fhs-env";
           targetPkgs = _: basePackages ++ packages;
@@ -33,7 +34,7 @@ let
 
       # WARN: only disable when debugging, else the resulting rootfs will not
       # be self-contained
-      includeStorePaths = true;
+      # includeStorePaths = true;
 
       # enableFakechroot = true;
       # fakeRootCommands =
@@ -55,7 +56,7 @@ let
       #   '';
 
       config = {
-        Cmd = [ "${pkgs.bash}/bin/bash" ];
+        entrypoint = [ "${pkgs.bash}/bin/bash" ];
       };
     };
 in

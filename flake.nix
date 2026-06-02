@@ -4,6 +4,10 @@
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     flake-utils.url = "github:numtide/flake-utils";
+    nix2container = {
+      url = "github:nlewo/nix2container";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
   outputs =
@@ -18,9 +22,10 @@
       let
         pkgs = import nixpkgs { inherit system; };
         lib = pkgs.lib;
+        n2c = inputs.nix2container.packages.${system};
 
         # nix build .#image-name
-        images = import ./nix/images.nix { inherit pkgs lib; };
+        images = import ./nix/images.nix { inherit pkgs lib n2c; };
 
         # nix build .#image-name-rootfs
         rootfs-scripts = import ./nix/rootfses.nix { inherit pkgs lib images; };
@@ -65,10 +70,15 @@
                 type = "full";
               };
           }).fhsenv;
+
+        oci = pkgs.writeShellScriptBin "build-oci-images" ''
+          ${images.default.copyTo}/bin/copy-to oci-archive:${images.default}.tar:${images.default}:latest
+          echo "Created container image in $(pwd)/${images.default}.tar"
+        '';
       in
       {
         packages = {
-          inherit build-all env;
+          inherit build-all env oci;
         }
         // images
         // rootfs-scripts;
