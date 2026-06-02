@@ -28,7 +28,7 @@
         images = import ./nix/images.nix { inherit pkgs lib n2c; };
 
         # nix build .#image-name-rootfs
-        rootfs-scripts = import ./nix/rootfses.nix { inherit pkgs lib images n2c; };
+        rootfs-scripts = import ./nix/rootfses.nix { inherit pkgs lib images; };
 
         # nix build .#build-all
         build-all = pkgs.runCommand "build-rootfs-all" { } ''
@@ -56,57 +56,11 @@
                 qemu-riscv64 -cpu max,vlen=256 "$FELIX86_PATH" "$@"
               '';
             };
-
-        # WIP:
-        env =
-          (pkgs.buildFHSEnvBubblewrap {
-            name = "fhs-rootfs";
-            version = "0.1.0";
-            targetPkgs =
-              pkgs:
-              import ./nix/packages.nix {
-                inherit pkgs;
-                lib = pkgs.lib;
-                type = "full";
-              };
-          }).fhsenv;
-
-        oci = pkgs.writeShellScriptBin "build-oci-images" ''
-          ${images.default.copyTo}/bin/copy-to oci-archive:./felix86-oci.tar:latest
-          echo "Created container image in ./felix86-oci.tar"
-        '';
-
-        oci2 = pkgs.writeShellScriptBin "build-rootfs-tarball" ''
-          export PATH="${
-            pkgs.lib.makeBinPath [
-              pkgs.umoci
-              pkgs.gnutar
-              pkgs.gzip
-            ]
-          }:$PATH"
-
-          echo "Building OCI layout folder..."
-          # nix2container's copyTo can output directly to an uncompressed oci directory structure
-          ${images.default.copyTo}/bin/copy-to oci:./felix86-oci-layout:latest
-
-          echo "Unpacking rootfs via umoci..."
-          umoci unpack --rootless --image ./felix86-oci-layout:latest ./unpacked-rootfs
-
-          echo "Creating compressed tarball..."
-          tar -czf ./felix86-rootfs.tar.gz -C ./unpacked-rootfs/rootfs .
-
-          # Clean up temporary layouts
-          rm -rf ./felix86-oci-layout ./unpacked-rootfs
-          echo "Successfully created flat rootfs in ./felix86-rootfs.tar.gz"
-        '';
       in
       {
         packages = {
           inherit
             build-all
-            env
-            oci
-            oci2
             ;
         }
         // images
