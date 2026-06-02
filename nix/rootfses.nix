@@ -2,37 +2,33 @@
   images,
   pkgs,
   lib,
-  n2c,
 }:
 
 let
   mkTarball =
     {
       name,
-      type,
+      baseImage,
     }:
 
     pkgs.runCommand name
       {
         nativeBuildInputs = with pkgs; [
           gnutar
-          gzip
           umoci
+          writableTmpDirAsHomeHook
         ];
-        LOCALE_ARCHIVE = "${pkgs.glibcLocales}/lib/locale/locale-archive";
       }
       ''
-        export HOME="$PWD"
-        export TMPDIR="$PWD/tmp"
-        mkdir -p "$TMPDIR" oci-layout unpacked
+        mkdir -p oci-layout unpacked
 
-        # copy image to OCI layout directory (matches oci2 approach)
-        ${images.default.copyTo}/bin/copy-to oci:./oci-layout:latest
+        # copy image to OCI layout directory
+        ${baseImage.copyTo}/bin/copy-to oci:oci-layout:latest
 
-        # unpack using umoci (correctly handles whiteouts, etc.)
+        # unpack image
         umoci unpack --rootless --image ./oci-layout:latest ./unpacked
 
-        # create compressed tarball
+        # compress
         tar -c -C ./unpacked/rootfs . | gzip > "$out/${name}.tar.gz"
       '';
 in
@@ -40,6 +36,6 @@ in
 {
   default-rootfs = mkTarball {
     name = "felix86-rootfs";
-    type = "full";
+    baseImage = images.default;
   };
 }
