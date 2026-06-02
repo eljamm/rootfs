@@ -17,16 +17,18 @@ let
         ];
       }
       ''
-        mkdir -p oci-layout unpacked
+        set -e
+
+        mkdir -p oci-layout unpacked $out
 
         # copy image to OCI layout directory
-        ${image.copyTo}/bin/copy-to oci:oci-layout:latest
+        ${image.copyTo}/bin/copy-to oci:./oci-layout:${image.imageTag}
 
         # unpack image
-        umoci unpack --rootless --image ./oci-layout:latest ./unpacked
+        umoci unpack --rootless --image ./oci-layout:${image.imageTag} ./unpacked
 
         # compress
-        tar -c -C ./unpacked/rootfs . | gzip > "$out/${image.imageName}.tar.gz"
+        tar -czf "$out/${image.imageName}.tar.gz" -C ./unpacked/rootfs .
       '';
 in
 
