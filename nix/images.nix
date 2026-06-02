@@ -30,16 +30,26 @@ let
           name = "felix86-fhs-env";
           targetPkgs = _: basePackages ++ extraPackages;
         }).fhsenv;
+
+      container = n2c.nix2container.buildImage {
+        name = name;
+        tag = "latest";
+        copyToRoot = rootEnv;
+        config = {
+          entrypoint = [ "${pkgs.bash}/bin/bash" ];
+        };
+      };
     in
 
-    n2c.nix2container.buildImage {
-      name = name;
-      tag = "latest";
-      copyToRoot = rootEnv;
-      config = {
-        entrypoint = [ "${pkgs.bash}/bin/bash" ];
-      };
-    };
+    container.overrideAttrs (
+      _final: prev: {
+        passthru = prev.passthru // {
+          # Include envrionment for debugging:
+          #   nix build .#image-name.rootEnv
+          inherit rootEnv;
+        };
+      }
+    );
 in
 
 {
