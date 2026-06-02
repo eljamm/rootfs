@@ -72,13 +72,42 @@
           }).fhsenv;
 
         oci = pkgs.writeShellScriptBin "build-oci-images" ''
-          ${images.default.copyTo}/bin/copy-to oci-archive:${images.default}.tar:${images.default}:latest
-          echo "Created container image in $(pwd)/${images.default}.tar"
+          ${images.default.copyTo}/bin/copy-to oci-archive:./felix86-oci.tar:latest
+          echo "Created container image in ./felix86-oci.tar"
+        '';
+
+        oci2 = pkgs.writeShellScriptBin "build-rootfs-tarball" ''
+          export PATH="${
+            pkgs.lib.makeBinPath [
+              pkgs.umoci
+              pkgs.gnutar
+              pkgs.gzip
+            ]
+          }:$PATH"
+
+          echo "Building OCI layout folder..."
+          # nix2container's copyTo can output directly to an uncompressed oci directory structure
+          ${images.default.copyTo}/bin/copy-to oci:./felix86-oci-layout:latest
+
+          echo "Unpacking rootfs via umoci..."
+          umoci unpack --rootless --image ./felix86-oci-layout:latest ./unpacked-rootfs
+
+          echo "Creating compressed tarball..."
+          tar -czf ./felix86-rootfs.tar.gz -C ./unpacked-rootfs/rootfs .
+
+          # Clean up temporary layouts
+          rm -rf ./felix86-oci-layout ./unpacked-rootfs
+          echo "Successfully created flat rootfs in ./felix86-rootfs.tar.gz"
         '';
       in
       {
         packages = {
-          inherit build-all env oci;
+          inherit
+            build-all
+            env
+            oci
+            oci2
+            ;
         }
         // images
         // rootfs-scripts;
