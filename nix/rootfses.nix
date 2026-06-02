@@ -1,72 +1,84 @@
 {
-  images,
   pkgs,
   lib,
   ...
 }:
 
 let
-  mkTarball =
-    image:
+  mkRootfs =
+    {
+      name,
+      extraPackages,
+      type,
+    }:
 
-    pkgs.writeShellApplication {
-      name = image.imageName;
-      runtimeInputs = with pkgs; [
-        fakeroot
-        gnutar
-        umoci
+    assert lib.elem type [
+      "minimal"
+      "full"
+    ];
+
+    let
+      basePackages = import ./packages.nix {
+        inherit pkgs lib type;
+      };
+
+      rootEnv =
+        # Construct an FHS environment that follows UsrMerge. See:
+        # - https://github.com/NixOS/nixpkgs/blob/master/doc/build-helpers/special/fhs-environments.section.md
+        # - https://www.freedesktop.org/wiki/Software/systemd/TheCaseForTheUsrMerge
+        pkgs.buildFHSEnv {
+          name = "${name}-fhs-env";
+          targetPkgs = _: basePackages ++ extraPackages;
+        };
+
+      rootFHS = rootEnv.fhsenv;
+    in
+    pkgs.stdenv.mkDerivation {
+      name = "${name}-rootfs";
+
+      # This tells Nix to compute the closure of the FHS env and write
+      # the list of paths to a file named "graph". See:
+      # https://nix.dev/manual/nix/2.34/language/advanced-attributes#adv-attr-exportReferencesGraph
+      exportReferencesGraph = [
+        "graph"
+        rootEnv
       ];
-      text = ''
-        set -e
 
-        TMPDIR=$(mktemp -d)
+      buildCommand =
+        # bash
+        ''
+          mkdir -p $out/nix/store
 
-        cleanup() {
-          # links to Nix store must be writable, otherwise they can't be removed
-          [[ -d "$TMPDIR" ]] && chmod -R +w "$TMPDIR" 2>/dev/null || true
-          rm -rf "$TMPDIR"
-        }
-        trap cleanup EXIT
+          cp -R ${rootEnv.fhsenv}/. $out/
 
-        IMAGE_NAME="${image.imageName}"
-        IMAGE_TAG="${image.imageTag}"
+          # copy all FHS dependencies to the output's Nix store
+          while read path; do
+            # skip copying the env itself to prevent collisions
+            if [[ "$path" == "${rootEnv}" ]]; then
+              continue
+            fi
 
-        echo "Unpacking $IMAGE_NAME:$IMAGE_TAG image"
-        pushd "$TMPDIR"
-        mkdir -p oci-layout unpacked
+            # copy store paths that don't already exist in output
+            if [[ -e "$path" ]] && [[ ! -e "$out/nix/store/$(basename "$path")" ]]; then
+              cp -a "$path" $out/nix/store/
+            fi
+          done < graph
+        '';
 
-        # copy image to an OCI-layout directory
-        ${image.copyTo}/bin/copy-to oci:./oci-layout:$IMAGE_TAG
-
-        umoci unpack --rootless --image ./oci-layout:$IMAGE_TAG ./unpacked
-        popd
-
-        ROOTFS_PATH="./rootfs-$IMAGE_NAME"
-        TARGET_PATH="$ROOTFS_PATH"
-
-        if [[ -d "$ROOTFS_PATH" ]]; then
-            counter=1
-            # loop until we find a suffix number that doesn't exist, yet
-            while [[ -d "''${ROOTFS_PATH}_''${counter}" ]]; do
-                ((counter++))
-            done
-            TARGET_PATH="''${ROOTFS_PATH}_''${counter}"
-        fi
-
-        echo "Creating rootfs in $TARGET_PATH"
-        cp -a "$TMPDIR"/unpacked/rootfs "$TARGET_PATH"
-        fakeroot chown -R root:root "$TARGET_PATH"
-
-        echo "Writing rootfs tarball to $IMAGE_NAME.tar.gz"
-        tar \
-          --owner=0 \
-          --group=0 \
-          -czf "$IMAGE_NAME.tar.gz" \
-          -C "$TARGET_PATH" \
-          .
-      '';
+      # nix build .#image-name.passthru.<name>
+      passthru = {
+        inherit
+          rootEnv
+          rootFHS
+          ;
+      };
     };
 in
 
-# convert all OCI artefacts into scripts that generate compressed tarballs
-lib.mapAttrs' (name: value: lib.nameValuePair (name + "-rootfs") (mkTarball value)) images
+{
+  default = mkRootfs {
+    name = "felix86";
+    type = "full";
+    extraPackages = with pkgs; [ ];
+  };
+}
