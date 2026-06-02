@@ -2,6 +2,7 @@
   images,
   pkgs,
   lib,
+  n2c,
 }:
 
 let
@@ -16,22 +17,24 @@ let
         nativeBuildInputs = with pkgs; [
           gnutar
           gzip
-          jq
+          umoci
         ];
+        LOCALE_ARCHIVE = "${pkgs.glibcLocales}/lib/locale/locale-archive";
       }
       ''
-        mkdir -p root image
+        export HOME="$PWD"
+        export TMPDIR="$PWD/tmp"
+        mkdir -p "$TMPDIR" oci-layout unpacked
 
-        # extract OCI image tarball
-        tar xf "${images.default}" -C image
+        # copy image to OCI layout directory (matches oci2 approach)
+        ${images.default.copyTo}/bin/copy-to oci:./oci-layout:latest
 
-        # apply layers in order (from manifest.json)
-        jq -r '.[0].Layers[]' image/manifest.json | while read layer; do
-          tar xf "image/$layer" -C root
-        done
+        # unpack using umoci (correctly handles whiteouts, etc.)
+        umoci unpack --rootless --image ./oci-layout:latest ./unpacked
 
-        # create flat rootfs tarball
-        tar czf "$out/${name}.tar.gz" -C root .
+        # create compressed tarball using a pipe to avoid -C ordering issues
+        mkdir -p "$out"
+        tar -c -C ./unpacked/rootfs . | gzip > "$out/${name}.tar.gz"
       '';
 in
 

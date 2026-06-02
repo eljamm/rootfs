@@ -28,7 +28,7 @@
         images = import ./nix/images.nix { inherit pkgs lib n2c; };
 
         # nix build .#image-name-rootfs
-        rootfs-scripts = import ./nix/rootfses.nix { inherit pkgs lib images; };
+        rootfs-scripts = import ./nix/rootfses.nix { inherit pkgs lib images n2c; };
 
         # nix build .#build-all
         build-all = pkgs.runCommand "build-rootfs-all" { } ''
