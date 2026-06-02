@@ -93,7 +93,5 @@ let
     };
   };
 in
-(pkgs.buildFHSEnvBubblewrap {
-  name = "felix86-fhs-env";
-  targetPkgs = _: with types.${type}; pkgs64 ++ pkgs32;
-}).fhsenv
+with types.${type};
+pkgs64 ++ pkgs32
