@@ -32,8 +32,7 @@ let
         # unpack using umoci (correctly handles whiteouts, etc.)
         umoci unpack --rootless --image ./oci-layout:latest ./unpacked
 
-        # create compressed tarball using a pipe to avoid -C ordering issues
-        mkdir -p "$out"
+        # create compressed tarball
         tar -c -C ./unpacked/rootfs . | gzip > "$out/${name}.tar.gz"
       '';
 in
