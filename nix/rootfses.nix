@@ -82,9 +82,9 @@ let
           cp -R ${rootEnv.fhsenv}/. $out/
 
           # copy all FHS dependencies to the output's Nix store
-          while read path; do
-            # skip copying the env itself to prevent collisions
-            if [[ "$path" == "${rootEnv}" ]]; then
+          while read -r path; do
+            # skip copying the env itself to prevent issues
+            if [[ "$path" =~ "fhs-env" ]]; then
               continue
             fi
 
