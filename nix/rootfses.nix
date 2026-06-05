@@ -7,7 +7,27 @@
 
 let
   # native if on x86_64/x86, cross-compiled otherwise
-  pkgs64 = if system == "x86_64-linux" then pkgsNative else pkgsNative.pkgsCross.gnu64;
+  pkgs64 =
+    if system == "x86_64-linux" then
+      pkgsNative
+    else
+      pkgsNative.pkgsCross.gnu64.extend (
+        _final: _prev: {
+          # On non-x86 hosts, pkgsi686Linux is defined as "32-bit version of
+          # the host architecture" [^1], so on RISC-V you'd get 32-bit RISC-V,
+          # not 32-bit x86.
+          #
+          # Here, we replace it with a cross-compiled i686 set, such that the
+          # result is always 32-bit x86, independent of the host architecture.
+          #
+          # This is needed by packages like mangohud and non-WoW64 wine,
+          # which require both x86_64 and i686 components.
+          #
+          # ---
+          # [^1]: https://github.com/NixOS/nixpkgs/blob/1c117f5aff5200b7648587e05eb74c0c340211f2/pkgs/top-level/stage.nix#L214
+          pkgsi686Linux = pkgsNative.pkgsCross.gnu32;
+        }
+      );
   pkgs32 = if system == "x86_64-linux" then pkgsNative.pkgsi686Linux else pkgsNative.pkgsCross.gnu32;
 
   mkRootfs =

@@ -85,9 +85,7 @@ let
           # - https://wiki.archlinux.org/title/Wine#32-bit_Windows_applications
           wineWow64Packages.stable
 
-          (mangohud.override {
-            pkgsi686Linux = pkgs32;
-          })
+          mangohud
         ]);
 
       pkgs32 =
