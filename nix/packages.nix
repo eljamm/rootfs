@@ -79,18 +79,21 @@ let
           libva
           llvm
           clinfo
-        ])
-        # These packages are only available on x86_64 hosts because they also
-        # need i686 packages, which can't be accessed when cross-compiling
-        ++ lib.optionals (pkgs64.stdenv.buildPlatform.isx86) (
-          with pkgs64;
-          [
-            mangohud
-            winePackages.base
-          ]
-        );
 
-      pkgs32 = types.minimal.pkgs32 ++ (with pkgs32; [ ]);
+          # WoW64 wine works on both native and cross x86_64 builds. Also see:
+          # - https://wiki.nixos.org/wiki/Wine
+          # - https://wiki.archlinux.org/title/Wine#32-bit_Windows_applications
+          wineWow64Packages.stable
+
+          (mangohud.override {
+            pkgsi686Linux = pkgs32;
+          })
+        ]);
+
+      pkgs32 =
+        types.minimal.pkgs32
+        ++ (with pkgs32; [
+        ]);
     };
   };
 in
