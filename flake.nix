@@ -26,10 +26,8 @@
           lib = pkgs.lib;
 
           rootfses = import ./nix/rootfses.nix {
-            inherit lib;
-
-            # cross-compile to x86/x86_64 linux if we're on a different system
-            pkgs = if system == "x86_64-linux" then pkgs else pkgs.pkgsCross.gnu64;
+            inherit lib system;
+            pkgsNative = pkgs;
           };
         in
         {

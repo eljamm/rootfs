@@ -1,10 +1,15 @@
 {
-  pkgs,
+  pkgsNative,
   lib,
+  system,
   ...
 }:
 
 let
+  # native if on x86_64/x86, cross-compiled otherwise
+  pkgs64 = if system == "x86_64-linux" then pkgsNative else pkgsNative.pkgsCross.gnu64;
+  pkgs32 = if system == "x86_64-linux" then pkgsNative.pkgsi686Linux else pkgsNative.pkgsCross.gnu32;
+
   mkRootfs =
     {
       name,
@@ -19,21 +24,26 @@ let
 
     let
       basePackages = import ./packages.nix {
-        inherit pkgs lib type;
+        inherit
+          lib
+          type
+          pkgs64
+          pkgs32
+          ;
       };
 
       rootEnv =
         # Construct an FHS environment that follows UsrMerge. See:
         # - https://github.com/NixOS/nixpkgs/blob/master/doc/build-helpers/special/fhs-environments.section.md
         # - https://www.freedesktop.org/wiki/Software/systemd/TheCaseForTheUsrMerge
-        pkgs.buildFHSEnv {
+        pkgsNative.buildFHSEnv {
           name = "${name}-fhs-env";
           targetPkgs = _: basePackages ++ extraPackages;
         };
 
       rootFHS = rootEnv.fhsenv;
     in
-    pkgs.stdenv.mkDerivation {
+    pkgsNative.stdenv.mkDerivation {
       name = "${name}-rootfs";
 
       # This tells Nix to compute the closure of the FHS env and write
@@ -79,6 +89,6 @@ in
   default = mkRootfs {
     name = "felix86";
     type = "full";
-    extraPackages = with pkgs; [ ];
+    extraPackages = with pkgsNative; [ ];
   };
 }

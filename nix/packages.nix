@@ -1,7 +1,7 @@
 {
-  pkgs,
+  pkgs64,
+  pkgs32,
   lib,
-
   type,
 }:
 
@@ -13,7 +13,7 @@ assert lib.elem type [
 let
   types = {
     minimal = {
-      pkgs64 = with pkgs; [
+      pkgs64 = with pkgs64; [
         bash
         coreutils
 
@@ -55,14 +55,13 @@ let
         libxkbcommon
       ];
 
-      pkgs32 = with pkgs.pkgsi686Linux; [
-      ];
+      pkgs32 = with pkgs32; [ ];
     };
 
     full = {
       pkgs64 =
         types.minimal.pkgs64
-        ++ (with pkgs; [
+        ++ (with pkgs64; [
           # multimedia
           SDL
           SDL2
@@ -80,18 +79,19 @@ let
           libva
           llvm
           clinfo
+        ])
+        # These packages are only available on x86_64 hosts because they also
+        # need i686 packages, which can't be accessed when cross-compiling
+        ++ lib.optionals (pkgs64.stdenv.buildPlatform.isx86) (
+          with pkgs64;
+          [
+            mangohud
+            winePackages.base
+          ]
+        );
 
-          # gaming
-          mangohud
-          winePackages.base # 32-bit & 64-bit on x86_64-linux, else 32-bit
-        ]);
-
-      pkgs32 =
-        types.minimal.pkgs32
-        ++ (with pkgs.pkgsi686Linux; [
-        ]);
+      pkgs32 = types.minimal.pkgs32 ++ (with pkgs32; [ ]);
     };
   };
 in
-with types.${type};
-pkgs64 ++ pkgs32
+types.${type}.pkgs64 ++ types.${type}.pkgs32
